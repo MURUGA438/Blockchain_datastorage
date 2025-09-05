@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Decentralized Image & Text Storage</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f8f9fa;
+    }
+
+    header {
+      background: #343a40;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    h2 {
+      margin-top: 0;
+      text-align: center;
+      color: #333;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-size: 15px;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .output {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .stored-item {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 10px;
+      width: 250px;
+      text-align: center;
+      background: #fdfdfd;
+    }
+
+    .stored-item img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🗂️ Decentralized Image & Text Storage</h1>
+  </header>
+
+  <div class="container">
+
+    <!-- Wallet Connect -->
+    <div class="card">
+      <h2>Wallet</h2>
+      <button onclick="connectWallet()">🔗 Connect MetaMask</button>
+      <p id="walletAddress"></p>
+    </div>
+
+    <!-- Upload Image -->
+    <div class="card">
+      <h2>Upload Image</h2>
+      <input type="file" id="imageInput" accept="image/*">
+      <button onclick="uploadImage()">⬆️ Upload Image</button>
+    </div>
+
+    <!-- Upload Text -->
+    <div class="card">
+      <h2>Upload Text</h2>
+      <textarea id="textInput" placeholder="Enter your text..."></textarea>
+      <button onclick="uploadText()">⬆️ Upload Text</button>
+    </div>
+
+    <!-- View Stored Data -->
+    <div class="card">
+      <h2>Stored Data</h2>
+      <button onclick="viewStored()">📂 View</button>
+      <div class="output" id="output"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.0/web3.min.js"></script>
+  <script>
+    let account;
+    const PINATA_API_KEY = "YOUR_API_KEY";
+    const PINATA_SECRET = "YOUR_API_SECRET";
+
+    const contractAddress = "YOUR_CONTRACT_ADDRESS";
+    const contractABI = [
+      {
+        "inputs": [{ "internalType": "string", "name": "_ipfsHash", "type": "string" }],
+        "name": "uploadImage",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [{ "internalType": "string", "name": "_text", "type": "string" }],
+        "name": "uploadText",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
+
+    let contract;
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        account = accounts[0];
+        document.getElementById("walletAddress").innerText = "Connected: " + account;
+        window.web3 = new Web3(window.ethereum);
+        contract = new web3.eth.Contract(contractABI, contractAddress);
+      } else {
+        alert("MetaMask not found!");
+      }
+    }
+
+    async function uploadImage() {
+      const file = document.getElementById("imageInput").files[0];
+      if (!file) return alert("Choose an image first!");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+        method: "POST",
+        headers: {
+          "pinata_api_key": PINATA_API_KEY,
+          "pinata_secret_api_key": PINATA_SECRET
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      const ipfsHash = data.IpfsHash;
+
+      await contract.methods.uploadImage(ipfsHash).send({ from: account });
+
+      alert("Image uploaded! Hash: " + ipfsHash);
+    }
+
+    async function uploadText() {
+      const text = document.getElementById("textInput").value;
+      if (!text) return alert("Enter some text!");
+
+      await contract.methods.uploadText(text).send({ from: account });
+
+      alert("Text uploaded!");
+    }
+
+    async function viewStored() {
+      // DEMO – In real contract, loop through imageCount & texts
+      document.getElementById("output").innerHTML = `
+        <div class="stored-item">
+          <img src="https://gateway.pinata.cloud/ipfs/EXAMPLE_CID" alt="Stored">
+          <p>Example text stored on blockchain</p>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
